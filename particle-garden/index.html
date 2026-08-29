@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Particle Garden</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --border: #30363d;
+    --text: #c9d1d9;
+    --accent: #58a6ff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: radial-gradient(circle at 50% 0%, #1a2233, var(--bg) 70%);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+    gap: 14px;
+  }
+  h1 {
+    margin: 0;
+    font-size: 1.6rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    background: linear-gradient(90deg, #79c0ff, #ffa657, #7ee787);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .subtitle {
+    margin: -8px 0 4px;
+    font-size: 0.85rem;
+    color: #8b949e;
+  }
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    justify-content: center;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    max-width: 900px;
+  }
+  .tool-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: #0d1117;
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 7px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.15s ease;
+  }
+  .tool-btn:hover { border-color: var(--accent); }
+  .tool-btn.active {
+    border-color: var(--accent);
+    background: #1c2530;
+    box-shadow: 0 0 0 1px var(--accent) inset;
+  }
+  .swatch {
+    width: 12px; height: 12px; border-radius: 3px; display: inline-block;
+  }
+  .divider { width: 1px; height: 24px; background: var(--border); margin: 0 4px; }
+  .toolbar label { font-size: 0.8rem; color: #8b949e; display: flex; align-items: center; gap: 6px; }
+  input[type=range] { accent-color: var(--accent); }
+  #clearBtn, #pauseBtn {
+    background: #21262d;
+  }
+  canvas {
+    background: #05070a;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    cursor: crosshair;
+    touch-action: none;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+    max-width: 100%;
+    height: auto;
+  }
+  .hint {
+    font-size: 0.78rem;
+    color: #6e7681;
+    text-align: center;
+    max-width: 700px;
+  }
+</style>
+</head>
+<body>
+
+<h1>🌱 Particle Garden</h1>
+<div class="subtitle">A tiny falling-sand sandbox — paint elements and watch them react</div>
+
+<div class="toolbar" id="toolbar">
+  <button class="tool-btn active" data-mat="1"><span class="swatch" style="background:#d9b26a"></span>Sand</button>
+  <button class="tool-btn" data-mat="2"><span class="swatch" style="background:#3a8fd9"></span>Water</button>
+  <button class="tool-btn" data-mat="3"><span class="swatch" style="background:#ff6a3d"></span>Fire</button>
+  <button class="tool-btn" data-mat="4"><span class="swatch" style="background:#8a8f98"></span>Smoke</button>
+  <button class="tool-btn" data-mat="5"><span class="swatch" style="background:#6b5344"></span>Wall</button>
+  <button class="tool-btn" data-mat="0"><span class="swatch" style="background:#222"></span>Erase</button>
+  <div class="divider"></div>
+  <label>Brush <input type="range" id="brush" min="1" max="12" value="4"></label>
+  <div class="divider"></div>
+  <button class="tool-btn" id="pauseBtn">⏸ Pause</button>
+  <button class="tool-btn" id="clearBtn">🗑 Clear</button>
+</div>
+
+<canvas id="c" width="750" height="480"></canvas>
+<div class="hint">Click / touch and drag to paint. Sand piles &amp; sinks through water. Water flows and spreads. Fire rises, burns out, and turns to smoke — water puts it out. Walls block everything.</div>
+
+<script>
+(() => {
+  const CELL = 4;
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  const COLS = canvas.width / CELL | 0;
+  const ROWS = canvas.height / CELL | 0;
+
+  const EMPTY = 0, SAND = 1, WATER = 2, FIRE = 3, SMOKE = 4, WALL = 5;
+
+  const grid = new Uint8Array(COLS * ROWS);
+  const life = new Uint8Array(COLS * ROWS);   // used by fire/smoke
+  const shade = new Uint8Array(COLS * ROWS);  // per-cell color variance
+  let moved = new Uint8Array(COLS * ROWS);
+
+  const idx = (x, y) => y * COLS + x;
+  const inBounds = (x, y) => x >= 0 && x < COLS && y >= 0 && y < ROWS;
+
+  function setCell(x, y, mat) {
+    if (!inBounds(x, y)) return;
+    const i = idx(x, y);
+    grid[i] = mat;
+    shade[i] = (Math.random() * 30) | 0;
+    if (mat === FIRE) life[i] = 25 + ((Math.random() * 20) | 0);
+    else if (mat === SMOKE) life[i] = 60 + ((Math.random() * 40) | 0);
+    else life[i] = 0;
+  }
+
+  function clearAll() {
+    grid.fill(EMPTY);
+    life.fill(0);
+  }
+
+  // ---------- painting ----------
+  let currentMat = SAND;
+  let brush = 4;
+  let painting = false;
+
+  document.querySelectorAll('.tool-btn[data-mat]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tool-btn[data-mat]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentMat = parseInt(btn.dataset.mat, 10);
+    });
+  });
+  document.getElementById('brush').addEventListener('input', e => brush = parseInt(e.target.value, 10));
+  document.getElementById('clearBtn').addEventListener('click', clearAll);
+
+  let paused = false;
+  const pauseBtn = document.getElementById('pauseBtn');
+  pauseBtn.addEventListener('click', () => {
+    paused = !paused;
+    pauseBtn.textContent = paused ? '▶ Play' : '⏸ Pause';
+  });
+
+  function canvasPos(evt) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const clientX = evt.touches ? evt.touches[0].clientX : evt.clientX;
+    const clientY = evt.touches ? evt.touches[0].clientY : evt.clientY;
+    return {
+      x: ((clientX - rect.left) * scaleX / CELL) | 0,
+      y: ((clientY - rect.top) * scaleY / CELL) | 0
+    };
+  }
+
+  function paintAt(cx, cy) {
+    const r = brush;
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (dx * dx + dy * dy <= r * r) {
+          if (currentMat !== EMPTY && Math.random() < 0.55) continue; // sparser stream for non-erase
+          setCell(cx + dx, cy + dy, currentMat);
+        }
+      }
+    }
+  }
+
+  function startPaint(e) {
+    painting = true;
+    const p = canvasPos(e);
+    paintAt(p.x, p.y);
+    e.preventDefault();
+  }
+  function movePaint(e) {
+    if (!painting) return;
+    const p = canvasPos(e);
+    paintAt(p.x, p.y);
+    e.preventDefault();
+  }
+  function endPaint() { painting = false; }
+
+  canvas.addEventListener('mousedown', startPaint);
+  canvas.addEventListener('mousemove', movePaint);
+  window.addEventListener('mouseup', endPaint);
+  canvas.addEventListener('touchstart', startPaint, { passive: false });
+  canvas.addEventListener('touchmove', movePaint, { passive: false });
+  window.addEventListener('touchend', endPaint);
+
+  // ---------- simulation ----------
+  function tryMove(x, y, nx, ny) {
+    if (!inBounds(nx, ny)) return false;
+    const i = idx(x, y), j = idx(nx, ny);
+    if (grid[j] === EMPTY) {
+      grid[j] = grid[i]; life[j] = life[i]; shade[j] = shade[i];
+      grid[i] = EMPTY; life[i] = 0;
+      moved[j] = 1;
+      return true;
+    }
+    return false;
+  }
+
+  function trySwap(x, y, nx, ny) {
+    if (!inBounds(nx, ny)) return false;
+    const i = idx(x, y), j = idx(nx, ny);
+    const tmpG = grid[j], tmpL = life[j], tmpS = shade[j];
+    grid[j] = grid[i]; life[j] = life[i]; shade[j] = shade[i];
+    grid[i] = tmpG; life[i] = tmpL; shade[i] = tmpS;
+    moved[j] = 1;
+    return true;
+  }
+
+  function step() {
+    moved.fill(0);
+
+    // gravity materials: bottom-to-top so a cell doesn't fall twice in one tick
+    for (let y = ROWS - 1; y >= 0; y--) {
+      for (let x = 0; x < COLS; x++) {
+        const i = idx(x, y);
+        if (moved[i]) continue;
+        const mat = grid[i];
+        if (mat === SAND) {
+          if (tryMove(x, y, x, y + 1)) continue;
+          const below = idx(x, y + 1);
+          if (inBounds(x, y + 1) && grid[below] === WATER) { trySwap(x, y, x, y + 1); continue; }
+          const dir = Math.random() < 0.5 ? -1 : 1;
+          if (tryMove(x, y, x + dir, y + 1)) continue;
+          tryMove(x, y, x - dir, y + 1);
+        } else if (mat === WATER) {
+          if (tryMove(x, y, x, y + 1)) continue;
+          const dir = Math.random() < 0.5 ? -1 : 1;
+          if (tryMove(x, y, x + dir, y + 1)) continue;
+          if (tryMove(x, y, x - dir, y + 1)) continue;
+          if (tryMove(x, y, x + dir, y)) continue;
+          tryMove(x, y, x - dir, y);
+        }
+      }
+    }
+
+    // rising materials: top-to-bottom
+    for (let y = 0; y < ROWS; y++) {
+      for (let x = 0; x < COLS; x++) {
+        const i = idx(x, y);
+        if (moved[i]) continue;
+        const mat = grid[i];
+        if (mat === FIRE) {
+          life[i]--;
+          if (life[i] <= 0) {
+            grid[i] = Math.random() < 0.5 ? SMOKE : EMPTY;
+            life[i] = grid[i] === SMOKE ? 50 : 0;
+            shade[i] = (Math.random() * 30) | 0;
+            continue;
+          }
+          // extinguish if touching water
+          let extinguished = false;
+          for (const [ox, oy] of [[0,-1],[0,1],[-1,0],[1,0]]) {
+            const nx = x + ox, ny = y + oy;
+            if (inBounds(nx, ny) && grid[idx(nx, ny)] === WATER) { extinguished = true; break; }
+          }
+          if (extinguished) {
+            grid[i] = SMOKE; life[i] = 30; shade[i] = (Math.random() * 30) | 0;
+            continue;
+          }
+          const dir = Math.random() < 0.5 ? -1 : 1;
+          const targets = [[0, -1], [dir, -1], [-dir, -1]];
+          let didMove = false;
+          for (const [ox, oy] of targets) {
+            const nx = x + ox, ny = y + oy;
+            if (inBounds(nx, ny) && grid[idx(nx, ny)] === EMPTY) {
+              if (tryMove(x, y, nx, ny)) { didMove = true; break; }
+            }
+          }
+          if (!didMove) moved[i] = 1;
+        } else if (mat === SMOKE) {
+          life[i]--;
+          if (life[i] <= 0) { grid[i] = EMPTY; continue; }
+          const dir = Math.random() < 0.5 ? -1 : 1;
+          const targets = [[0, -1], [dir, -1], [-dir, -1], [dir, 0]];
+          let didMove = false;
+          for (const [ox, oy] of targets) {
+            const nx = x + ox, ny = y + oy;
+            if (inBounds(nx, ny) && grid[idx(nx, ny)] === EMPTY) {
+              if (tryMove(x, y, nx, ny)) { didMove = true; break; }
+            }
+          }
+          if (!didMove) moved[i] = 1;
+        }
+      }
+    }
+  }
+
+  // ---------- rendering ----------
+  const colors = {
+    [SAND]:  [217, 178, 106],
+    [WATER]: [58, 143, 217],
+    [FIRE]:  [255, 106, 61],
+    [SMOKE]: [138, 143, 152],
+    [WALL]:  [107, 83, 68]
+  };
+
+  function render() {
+    const imgData = ctx.createImageData(canvas.width, canvas.height);
+    const data = imgData.data;
+    for (let y = 0; y < ROWS; y++) {
+      for (let x = 0; x < COLS; x++) {
+        const i = idx(x, y);
+        const mat = grid[i];
+        if (mat === EMPTY) continue;
+        let [r, g, b] = colors[mat];
+        const variance = shade[i] - 15;
+        r = Math.min(255, Math.max(0, r + variance));
+        g = Math.min(255, Math.max(0, g + variance));
+        b = Math.min(255, Math.max(0, b + variance));
+        if (mat === FIRE) {
+          const flicker = life[i] < 10 ? life[i] / 10 : 1;
+          r *= flicker; g *= flicker; b *= flicker;
+        }
+        if (mat === SMOKE) {
+          // fade alpha handled via blended background write below
+        }
+        for (let py = 0; py < CELL; py++) {
+          for (let px = 0; px < CELL; px++) {
+            const cx = x * CELL + px, cy = y * CELL + py;
+            const p = (cy * canvas.width + cx) * 4;
+            data[p] = r; data[p + 1] = g; data[p + 2] = b;
+            data[p + 3] = mat === SMOKE ? Math.min(255, life[i] * 4) : 255;
+          }
+        }
+      }
+    }
+    ctx.fillStyle = '#05070a';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.putImageData(imgData, 0, 0);
+  }
+
+  function loop() {
+    if (!paused) step();
+    render();
+    requestAnimationFrame(loop);
+  }
+
+  // seed a little terrain so it's not empty on load
+  for (let x = 0; x < COLS; x++) {
+    const h = 6 + Math.floor(Math.sin(x * 0.15) * 3);
+    for (let y = ROWS - h; y < ROWS; y++) setCell(x, y, WALL);
+  }
+
+  loop();
+})();
+</script>
+</body>
+</html>
