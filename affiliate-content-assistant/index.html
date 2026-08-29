@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Affiliate Content Assistant</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --panel2: #1c2530;
+    --border: #30363d;
+    --text: #c9d1d9;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --good: #3fb950;
+    --warn: #d29922;
+    --bad: #f85149;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: radial-gradient(circle at 50% 0%, #1a2233, var(--bg) 70%);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    padding: 20px;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; }
+  h1 {
+    margin: 0 0 2px;
+    font-size: 1.6rem;
+    font-weight: 600;
+    background: linear-gradient(90deg, #79c0ff, #ffa657, #7ee787);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .subtitle { margin: 0 0 18px; font-size: 0.85rem; color: var(--muted); }
+
+  .tabs {
+    display: flex;
+    gap: 6px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+  }
+  .tab-btn {
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    padding: 10px 16px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+  }
+  .tab-btn.active { color: var(--text); border-bottom-color: var(--accent); }
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 14px;
+  }
+  .card h2 { margin: 0 0 4px; font-size: 1.05rem; }
+  .card .hint { margin: 0 0 12px; font-size: 0.78rem; color: var(--muted); }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+  label { display: block; font-size: 0.78rem; color: var(--muted); margin-bottom: 4px; }
+  input[type=text], input[type=number], select, textarea {
+    width: 100%;
+    background: #0d1117;
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 10px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-family: inherit;
+  }
+  textarea { resize: vertical; min-height: 44px; }
+  .field { margin-bottom: 10px; }
+
+  button.primary {
+    background: var(--accent);
+    border: none;
+    color: #04121f;
+    font-weight: 600;
+    padding: 9px 16px;
+    border-radius: 7px;
+    cursor: pointer;
+    font-size: 0.85rem;
+  }
+  button.primary:hover { filter: brightness(1.08); }
+  button.ghost {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 7px 12px;
+    border-radius: 7px;
+    cursor: pointer;
+    font-size: 0.8rem;
+  }
+  button.ghost:hover { border-color: var(--accent); }
+  button.small { padding: 4px 9px; font-size: 0.72rem; }
+  .row-actions { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 500; cursor: pointer; user-select: none; }
+  th:hover { color: var(--text); }
+  tr:hover td { background: #1a212b; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+  .badge { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; }
+  .badge.good { background: rgba(63,185,80,0.15); color: var(--good); }
+  .badge.warn { background: rgba(210,153,34,0.15); color: var(--warn); }
+  .badge.bad  { background: rgba(248,81,73,0.15); color: var(--bad); }
+
+  .score-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; margin-bottom: 10px; }
+  .score-fields .field label { display: flex; justify-content: space-between; }
+
+  .angle-card {
+    background: var(--panel2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 10px;
+  }
+  .angle-card .hook { font-weight: 600; margin-bottom: 6px; }
+  .angle-card .meta { font-size: 0.75rem; color: var(--muted); margin-bottom: 6px; white-space: pre-line; }
+  .angle-card .caption { font-size: 0.8rem; margin-bottom: 6px; }
+  .angle-card .hashtags { font-size: 0.75rem; color: var(--accent); margin-bottom: 8px; }
+
+  .empty { color: var(--muted); font-size: 0.85rem; padding: 20px; text-align: center; }
+  .toolbar-right { display: flex; gap: 8px; justify-content: flex-end; margin-bottom: 10px; }
+  select#genPlatform { max-width: 200px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🛒 Affiliate Content Assistant</h1>
+  <p class="subtitle">Score products, generate content angles, and track what actually gets reach — for your Shopee affiliate funnel.</p>
+
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="scorecard">1 · Product Scorecard</button>
+    <button class="tab-btn" data-tab="generator">2 · Content Angle Generator</button>
+    <button class="tab-btn" data-tab="tracker">3 · Reach Tracker</button>
+  </div>
+
+  <!-- ================= SCORECARD ================= -->
+  <div class="panel active" id="panel-scorecard">
+    <div class="card">
+      <h2>Add a product to evaluate</h2>
+      <p class="hint">Rate what you can observe (trend chatter, how many creators already push it, price, commission). This isn't live data — it's a structured way to score your gut read so you compare products consistently instead of chasing shiny objects.</p>
+
+      <div class="field">
+        <label>Product / niche name</label>
+        <input type="text" id="sc-name" placeholder="e.g. mini neck fan">
+      </div>
+
+      <div class="score-fields">
+        <div class="field">
+          <label>Trend / search interest <span></span></label>
+          <select id="sc-trend"><option value="2">Rising</option><option value="1">Steady</option><option value="0">Declining</option></select>
+        </div>
+        <div class="field">
+          <label>Organic social buzz seen recently</label>
+          <select id="sc-buzz"><option value="2">High</option><option value="1">Medium</option><option value="0">Low</option></select>
+        </div>
+        <div class="field">
+          <label>How strong is the pain point it solves?</label>
+          <select id="sc-pain"><option value="2">Strong / felt need</option><option value="1">Moderate</option><option value="0">Weak / nice-to-have</option></select>
+        </div>
+        <div class="field">
+          <label>Repeat purchase or gifting potential</label>
+          <select id="sc-repeat"><option value="2">Yes</option><option value="1">Maybe</option><option value="0">No</option></select>
+        </div>
+        <div class="field">
+          <label>Creators already heavily promoting it</label>
+          <select id="sc-competitors"><option value="2">Few</option><option value="1">Some</option><option value="0">Many</option></select>
+        </div>
+        <div class="field">
+          <label>Ad saturation you've noticed for it</label>
+          <select id="sc-adsat"><option value="2">Low</option><option value="1">Medium</option><option value="0">High</option></select>
+        </div>
+        <div class="field">
+          <label>Can you find a unique angle nobody's using?</label>
+          <select id="sc-angle"><option value="2">Yes, clearly</option><option value="1">Maybe</option><option value="0">Not really</option></select>
+        </div>
+        <div class="field">
+          <label>Commission rate</label>
+          <select id="sc-commission"><option value="2">Attractive</option><option value="1">Average</option><option value="0">Low</option></select>
+        </div>
+        <div class="field">
+          <label>Price in impulse-buy range</label>
+          <select id="sc-price"><option value="2">Yes</option><option value="1">Borderline</option><option value="0">No, considered purchase</option></select>
+        </div>
+      </div>
+
+      <div class="row-actions">
+        <button class="primary" id="sc-add">Add to scorecard</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Your evaluated products</h2>
+      <p class="hint">Sorted by score. 14–18 = strong candidate, 8–13 = worth testing, 0–7 = skip or find a new angle.</p>
+      <div id="sc-table-wrap"><div class="empty">No products scored yet — add one above.</div></div>
+    </div>
+  </div>
+
+  <!-- ================= GENERATOR ================= -->
+  <div class="panel" id="panel-generator">
+    <div class="card">
+      <h2>Generate content angles</h2>
+      <p class="hint">Fill in what you know about the product. You'll get a batch of hook + script + caption combos to storyboard and test — not a finished video, a starting point.</p>
+      <div class="grid">
+        <div class="field"><label>Product name</label><input type="text" id="gen-product" placeholder="e.g. mini neck fan"></div>
+        <div class="field"><label>Main pain point it solves</label><input type="text" id="gen-pain" placeholder="e.g. sweating through your commute"></div>
+        <div class="field"><label>Main benefit / payoff</label><input type="text" id="gen-benefit" placeholder="e.g. stay cool hands-free all day"></div>
+        <div class="field"><label>Target audience</label><input type="text" id="gen-audience" placeholder="e.g. students, commuters"></div>
+        <div class="field"><label>Price / offer detail (optional)</label><input type="text" id="gen-price" placeholder="e.g. under $15, buy 1 get 1"></div>
+        <div class="field"><label>Platform</label>
+          <select id="genPlatform"><option value="TikTok">TikTok</option><option value="Meta / Instagram Reels">Meta / Instagram Reels</option><option value="Both">Both</option></select>
+        </div>
+      </div>
+      <div class="row-actions">
+        <button class="primary" id="gen-run">Generate angles</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Generated angles</h2>
+      <div id="gen-results"><div class="empty">Fill in the form above and generate to see hook/script/caption ideas here.</div></div>
+    </div>
+
+    <div class="card">
+      <h2>Saved to content bank</h2>
+      <p class="hint">Angles you've saved — copy these into your Reach Tracker once posted.</p>
+      <div id="bank-results"><div class="empty">Nothing saved yet.</div></div>
+    </div>
+  </div>
+
+  <!-- ================= TRACKER ================= -->
+  <div class="panel" id="panel-tracker">
+    <div class="card">
+      <h2>Log a post</h2>
+      <p class="hint">After you post, come back and log the numbers. This is what tells you which hook/angle to double down on before you spend on ads.</p>
+      <div class="grid">
+        <div class="field"><label>Date</label><input type="text" id="tr-date" placeholder="YYYY-MM-DD"></div>
+        <div class="field"><label>Product</label><input type="text" id="tr-product" placeholder="e.g. mini neck fan"></div>
+        <div class="field"><label>Platform</label>
+          <select id="tr-platform"><option>TikTok</option><option>Meta / Instagram Reels</option><option>Other</option></select>
+        </div>
+        <div class="field"><label>Hook / angle used</label><input type="text" id="tr-hook" placeholder="short label, e.g. 'POV hook'"></div>
+        <div class="field"><label>Views</label><input type="number" id="tr-views" min="0" value="0"></div>
+        <div class="field"><label>Likes</label><input type="number" id="tr-likes" min="0" value="0"></div>
+        <div class="field"><label>Comments</label><input type="number" id="tr-comments" min="0" value="0"></div>
+        <div class="field"><label>Saves / shares</label><input type="number" id="tr-saves" min="0" value="0"></div>
+        <div class="field"><label>Clicks to affiliate link</label><input type="number" id="tr-clicks" min="0" value="0"></div>
+        <div class="field"><label>Purchases (if known)</label><input type="number" id="tr-purchases" min="0" value="0"></div>
+      </div>
+      <div class="row-actions">
+        <button class="primary" id="tr-add">Log entry</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Performance log</h2>
+      <p class="hint">Click a column header to sort. Engagement rate = (likes+comments+saves)/views. CTR = clicks/views.</p>
+      <div class="toolbar-right">
+        <button class="ghost small" id="export-btn">Export JSON</button>
+        <button class="ghost small" id="import-btn">Import JSON</button>
+        <input type="file" id="import-file" accept="application/json" style="display:none">
+      </div>
+      <div id="tr-table-wrap"><div class="empty">No posts logged yet.</div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const STORE_KEY = 'affiliate-content-assistant-v1';
+  const state = loadState();
+
+  function loadState() {
+    try {
+      const raw = localStorage.getItem(STORE_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch (e) {}
+    return { products: [], bank: [], posts: [] };
+  }
+  function saveState() {
+    localStorage.setItem(STORE_KEY, JSON.stringify(state));
+  }
+
+  function uid() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+  }
+
+  // ---------- tabs ----------
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+    });
+  });
+
+  // ---------- scorecard ----------
+  const scFields = ['sc-trend','sc-buzz','sc-pain','sc-repeat','sc-competitors','sc-adsat','sc-angle','sc-commission','sc-price'];
+
+  function verdict(score) {
+    if (score >= 14) return { label: 'Strong candidate', cls: 'good' };
+    if (score >= 8) return { label: 'Worth testing', cls: 'warn' };
+    return { label: 'Skip / rethink angle', cls: 'bad' };
+  }
+
+  function renderScorecard() {
+    const wrap = document.getElementById('sc-table-wrap');
+    if (state.products.length === 0) {
+      wrap.innerHTML = '<div class="empty">No products scored yet — add one above.</div>';
+      return;
+    }
+    const sorted = [...state.products].sort((a, b) => b.score - a.score);
+    let html = '<table><thead><tr><th>Product</th><th>Score</th><th>Verdict</th><th></th></tr></thead><tbody>';
+    sorted.forEach(p => {
+      const v = verdict(p.score);
+      html += `<tr><td>${escapeHtml(p.name)}</td><td class="num">${p.score} / 18</td><td><span class="badge ${v.cls}">${v.label}</span></td>
+        <td><button class="ghost small" data-del-product="${p.id}">Remove</button></td></tr>`;
+    });
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
+    wrap.querySelectorAll('[data-del-product]').forEach(b => {
+      b.addEventListener('click', () => {
+        state.products = state.products.filter(p => p.id !== b.dataset.delProduct);
+        saveState(); renderScorecard();
+      });
+    });
+  }
+
+  document.getElementById('sc-add').addEventListener('click', () => {
+    const name = document.getElementById('sc-name').value.trim();
+    if (!name) { document.getElementById('sc-name').focus(); return; }
+    let score = 0;
+    scFields.forEach(id => score += parseInt(document.getElementById(id).value, 10));
+    state.products.push({ id: uid(), name, score });
+    document.getElementById('sc-name').value = '';
+    saveState(); renderScorecard();
+  });
+
+  // ---------- content angle generator ----------
+  const hookTemplates = [
+    "POV: you just found out {product} can {benefit} and you're kicking yourself for not knowing sooner",
+    "I was today years old when I found out {product} solves {pain}",
+    "Stop scrolling if you deal with {pain} — this {product} changed everything for me",
+    "3 reasons {audience} are obsessed with {product} right now",
+    "Nobody's talking about this but {product} actually helps you {benefit}",
+    "Before vs after using {product} for {pain}",
+    "The {product} hack nobody told {audience} about",
+    "Things I wish I knew before buying {product}",
+    "Rating {product} out of 10 for {audience}",
+    "Storytime: how {product} saved me from {pain}",
+    "{audience}, this one's for you — {product} for {pain}",
+    "Why I regret not buying {product} sooner"
+  ];
+
+  const scriptSkeletons = [
+    "0-3s Hook: deliver the hook line straight to camera.\n3-8s Problem: show/describe {pain} in a relatable moment.\n8-15s Reveal: introduce {product} as the fix.\n15-25s Proof: quick demo or before/after showing {benefit}.\n25-30s CTA: point to link/basket, mention {price}.",
+    "0-3s Hook: hold up {product}, deliver hook line.\n3-10s Myth-bust: 'I thought X, but actually...' about {product}.\n10-20s Demo: show it solving {pain} in real time.\n20-27s Reaction: genuine reaction to {benefit}.\n27-30s CTA: tell {audience} where to get it, mention {price}.",
+    "0-3s Hook: text-on-screen hook + voiceover.\n3-12s Listicle: 3 quick reasons {audience} like {product} (benefit-led).\n12-22s B-roll: show {product} in use addressing {pain}.\n22-30s CTA: direct to link, urgency line if {price} is time-limited."
+  ];
+
+  const captionTemplates = [
+    "{product} lowkey fixed my {pain} 😭 linking it before it sells out",
+    "okay {audience} need to see this... {product} = {benefit}",
+    "not me finding the {product} that actually works. tap the link 🛒",
+    "{pain}? say less. {product} has entered the chat.",
+  ];
+
+  function hashtagsFor(product, niche) {
+    const base = product.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(Boolean);
+    const tags = new Set(['#TikTokMadeMeBuyIt', '#ShopeeFinds', '#AffiliateFinds']);
+    base.forEach(w => tags.add('#' + w));
+    if (niche) tags.add('#' + niche.toLowerCase().replace(/[^a-z0-9]/g, ''));
+    return [...tags].slice(0, 7).join(' ');
+  }
+
+  function fillTemplate(tpl, data) {
+    return tpl.replace(/\{(\w+)\}/g, (_, key) => data[key] || `[${key}]`);
+  }
+
+  function pickN(arr, n) {
+    const copy = [...arr];
+    const out = [];
+    while (copy.length && out.length < n) {
+      out.push(copy.splice(Math.floor(Math.random() * copy.length), 1)[0]);
+    }
+    return out;
+  }
+
+  function renderBank() {
+    const wrap = document.getElementById('bank-results');
+    if (state.bank.length === 0) {
+      wrap.innerHTML = '<div class="empty">Nothing saved yet.</div>';
+      return;
+    }
+    wrap.innerHTML = state.bank.map(item => `
+      <div class="angle-card">
+        <div class="hook">${escapeHtml(item.hook)}</div>
+        <div class="meta">${escapeHtml(item.script)}</div>
+        <div class="caption">${escapeHtml(item.caption)}</div>
+        <div class="hashtags">${escapeHtml(item.hashtags)}</div>
+        <button class="ghost small" data-del-bank="${item.id}">Remove</button>
+      </div>
+    `).join('');
+    wrap.querySelectorAll('[data-del-bank]').forEach(b => {
+      b.addEventListener('click', () => {
+        state.bank = state.bank.filter(i => i.id !== b.dataset.delBank);
+        saveState(); renderBank();
+      });
+    });
+  }
+
+  document.getElementById('gen-run').addEventListener('click', () => {
+    const data = {
+      product: document.getElementById('gen-product').value.trim() || 'this product',
+      pain: document.getElementById('gen-pain').value.trim() || 'that annoying problem',
+      benefit: document.getElementById('gen-benefit').value.trim() || 'make life easier',
+      audience: document.getElementById('gen-audience').value.trim() || 'people',
+      price: document.getElementById('gen-price').value.trim() || 'a great price',
+    };
+    const hooks = pickN(hookTemplates, 6);
+    const results = hooks.map(hTpl => {
+      const script = fillTemplate(pickN(scriptSkeletons, 1)[0], data);
+      const caption = fillTemplate(pickN(captionTemplates, 1)[0], data);
+      return {
+        id: uid(),
+        hook: fillTemplate(hTpl, data),
+        script,
+        caption,
+        hashtags: hashtagsFor(data.product, document.getElementById('gen-audience').value.trim())
+      };
+    });
+
+    const wrap = document.getElementById('gen-results');
+    wrap.innerHTML = results.map(r => `
+      <div class="angle-card">
+        <div class="hook">${escapeHtml(r.hook)}</div>
+        <div class="meta">${escapeHtml(r.script)}</div>
+        <div class="caption">${escapeHtml(r.caption)}</div>
+        <div class="hashtags">${escapeHtml(r.hashtags)}</div>
+        <div class="row-actions">
+          <button class="ghost small" data-save='${JSON.stringify(r).replace(/'/g, "&apos;")}'>Save to bank</button>
+        </div>
+      </div>
+    `).join('');
+    wrap.querySelectorAll('[data-save]').forEach(b => {
+      b.addEventListener('click', () => {
+        const item = JSON.parse(b.dataset.save.replace(/&apos;/g, "'"));
+        state.bank.push(item);
+        saveState(); renderBank();
+      });
+    });
+  });
+
+  // ---------- reach tracker ----------
+  let sortKey = 'date', sortDir = -1;
+
+  function computeMetrics(p) {
+    const engagement = p.views > 0 ? (p.likes + p.comments + p.saves) / p.views : 0;
+    const ctr = p.views > 0 ? p.clicks / p.views : 0;
+    return { engagement, ctr };
+  }
+
+  function renderTracker() {
+    const wrap = document.getElementById('tr-table-wrap');
+    if (state.posts.length === 0) {
+      wrap.innerHTML = '<div class="empty">No posts logged yet.</div>';
+      return;
+    }
+    const rows = state.posts.map(p => ({ ...p, ...computeMetrics(p) }));
+    rows.sort((a, b) => {
+      const av = a[sortKey], bv = b[sortKey];
+      if (typeof av === 'string') return sortDir * av.localeCompare(bv);
+      return sortDir * (av - bv);
+    });
+    let html = `<table><thead><tr>
+      <th data-sort="date">Date</th><th data-sort="product">Product</th><th data-sort="platform">Platform</th>
+      <th data-sort="hook">Hook</th><th data-sort="views">Views</th><th data-sort="engagement">Eng. rate</th>
+      <th data-sort="ctr">CTR</th><th data-sort="purchases">Purchases</th><th></th></tr></thead><tbody>`;
+    rows.forEach(p => {
+      html += `<tr>
+        <td>${escapeHtml(p.date)}</td><td>${escapeHtml(p.product)}</td><td>${escapeHtml(p.platform)}</td>
+        <td>${escapeHtml(p.hook)}</td><td class="num">${p.views}</td>
+        <td class="num">${(p.engagement * 100).toFixed(1)}%</td><td class="num">${(p.ctr * 100).toFixed(1)}%</td>
+        <td class="num">${p.purchases}</td>
+        <td><button class="ghost small" data-del-post="${p.id}">Remove</button></td></tr>`;
+    });
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
+    wrap.querySelectorAll('[data-sort]').forEach(th => {
+      th.addEventListener('click', () => {
+        const key = th.dataset.sort;
+        sortDir = (sortKey === key) ? -sortDir : -1;
+        sortKey = key;
+        renderTracker();
+      });
+    });
+    wrap.querySelectorAll('[data-del-post]').forEach(b => {
+      b.addEventListener('click', () => {
+        state.posts = state.posts.filter(p => p.id !== b.dataset.delPost);
+        saveState(); renderTracker();
+      });
+    });
+  }
+
+  document.getElementById('tr-add').addEventListener('click', () => {
+    const post = {
+      id: uid(),
+      date: document.getElementById('tr-date').value.trim() || new Date().toISOString().slice(0, 10),
+      product: document.getElementById('tr-product').value.trim(),
+      platform: document.getElementById('tr-platform').value,
+      hook: document.getElementById('tr-hook').value.trim(),
+      views: parseInt(document.getElementById('tr-views').value, 10) || 0,
+      likes: parseInt(document.getElementById('tr-likes').value, 10) || 0,
+      comments: parseInt(document.getElementById('tr-comments').value, 10) || 0,
+      saves: parseInt(document.getElementById('tr-saves').value, 10) || 0,
+      clicks: parseInt(document.getElementById('tr-clicks').value, 10) || 0,
+      purchases: parseInt(document.getElementById('tr-purchases').value, 10) || 0,
+    };
+    if (!post.product) { document.getElementById('tr-product').focus(); return; }
+    state.posts.push(post);
+    ['tr-product','tr-hook'].forEach(id => document.getElementById(id).value = '');
+    ['tr-views','tr-likes','tr-comments','tr-saves','tr-clicks','tr-purchases'].forEach(id => document.getElementById(id).value = 0);
+    saveState(); renderTracker();
+  });
+
+  // ---------- export / import ----------
+  document.getElementById('export-btn').addEventListener('click', () => {
+    const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'affiliate-content-assistant-backup.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+  document.getElementById('import-btn').addEventListener('click', () => {
+    document.getElementById('import-file').click();
+  });
+  document.getElementById('import-file').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(reader.result);
+        state.products = parsed.products || [];
+        state.bank = parsed.bank || [];
+        state.posts = parsed.posts || [];
+        saveState(); renderScorecard(); renderBank(); renderTracker();
+      } catch (err) { alert('Could not read that file as valid JSON.'); }
+    };
+    reader.readAsText(file);
+  });
+
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  renderScorecard();
+  renderBank();
+  renderTracker();
+})();
+</script>
+</body>
+</html>

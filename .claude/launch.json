@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "affiliate-content-assistant",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["--yes", "serve", "affiliate-content-assistant", "-l", "5183"],
+      "port": 5183
+    },
+    {
+      "name": "particle-garden",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["--yes", "serve", "particle-garden", "-l", "5184"],
+      "port": 5184
+    }
+  ]
+}
